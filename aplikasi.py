@@ -12,6 +12,10 @@ def daftar():
     body["class"]=[]
     body["classwork"]=[]
     
+    response={}
+    response["message"]="Create User Success"
+    response["data"]={}
+
     userData=[]
 
     if os.path.exists ('./registrasi.json'):
@@ -20,14 +24,15 @@ def daftar():
 
     for userId in userData:
         if body["user id"]==userId["user id"] and userData!=[]:
-            return "USER ID SUDAH ADA"
+            response["message"]="User ID {} is already exist".format(body["user id"])
+            return jsonify(response)
 
     userData.append(body)
 
     userDict= open('./registrasi.json','w')
     userDict.write(json.dumps(userData))
-    
-    return jsonify(userData)
+    response["data"]=body
+    return jsonify(response)
 
 @apps.route('/daftar/<int:userid>',methods=["PUT"])
 def updateUser(userid):
@@ -68,11 +73,21 @@ def getUser(n):
             return jsonify(user)
     return "USER ID TIDAK TERDAFTAR"
 
+@apps.route('/getUser/all',methods=["GET"])
+def getUserAll():
+    userFile = open('./registrasi.json','r')
+    userData = json.load(userFile)
+    return jsonify(userData)
+
 @apps.route('/class',methods=["POST"])
 def createClass():
     body= request.json
     body["student"]=[]
     body["classwork"]=[]
+
+    response={}
+    response["message"]="Create Class Success"
+    response["data"]={}
 
     userData=[]
     
@@ -82,7 +97,8 @@ def createClass():
     
     for classId in userData:
         if body["classid"]==classId["classid"] and userData!=[]:
-            return "CLASS ID SUDAH ADA"
+            response["message"]="Class ID {} is already exist".format(body["classid"])
+            return jsonify(response)
 
     userData.append(body)
 
@@ -105,7 +121,8 @@ def createClass():
     userFile = open('./registrasi.json','w')
     userFile.write(json.dumps(userData))
 
-    return jsonify(body)
+    response["data"]=body
+    return jsonify(response)
 
 @apps.route('/class/<int:classid>',methods=["PUT"])
 def updateClass(classid):
@@ -155,9 +172,8 @@ def getClassAll():
             for kelasid2 in userData2:
                 if kelasid2["classworkid"]==kelasid["classworkid"]:
                     kelas["classwork"]=kelasid2
-            return jsonify(userData)
-    return "CLASS ID TIDAK TERDAFTAR"
-
+    return jsonify(userData)
+    
 @apps.route('/class/<int:classid>',methods=["DELETE"])
 def removeClass(classid):
     #delete class di user
@@ -259,7 +275,7 @@ def joinClass():
 @apps.route('/outclass',methods=["DELETE"])
 def outclass():
     body = request.json
-
+    
     #remove user dari class
 
     userFile = open('./kelas.json','r')
@@ -269,15 +285,27 @@ def outclass():
         if body["classid"]==kelas["classid"]:
             if body["user id"] in kelas["student"]:
                 kelas["student"].remove(body["user id"])
-    userFile = open('./kelas.json','w')
-    userFile.write(json.dumps(userData))
+    userFile2 = open('./kelas.json','w')
+    userFile2.write(json.dumps(userData))
+    userFile2.close()
 
-    #remove class dari user
-
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    CWFile = open('./registrasi.json','r')
+    CWData = json.load(CWFile)
     
-    for user in userData:
+    #remove classwork dari user
+    userCWFile = open('./kelas.json','r')
+    userCWData = json.load(userCWFile) 
+
+    for userCW in userCWData:
+        if body["classid"]==userCW["classid"]:
+            for userCW2 in userCW["classwork"]:
+                for CW in CWData:
+                    if body["user id"]==CW["user id"]:
+                        for CW2 in CW["classwork"]:
+                            if userCW2["classworkid"]==CW2["classworkid"]:
+                                CW["classwork"].remove(CW2)
+    #remove class dari user
+    for user in CWData:
         if body["user id"]==user["user id"]:
             kelas={
                     "classid":body["classid"],
@@ -285,11 +313,11 @@ def outclass():
                 }
             if kelas in user["class"]:
                 user["class"].remove(kelas)
-                
-    userFile = open('./registrasi.json','w')
-    userFile.write(json.dumps(userData))
 
-    return jsonify(userData)
+    userFile = open('./registrasi.json','w')
+    userFile.write(json.dumps(CWData))
+    
+    return jsonify(CWData)
 
 @apps.route('/class/<int:classid>',methods=["POST"])
 def classwork(classid):
