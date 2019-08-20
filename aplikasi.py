@@ -11,6 +11,16 @@ def daftar():
     body= request.json
     body["class"]=[]
     body["classwork"]=[]
+
+    huruf="abcdefghijklmnopqrstuvwxyz"
+    password=body["password"]
+    body["password"]=""
+    for i in password:
+        x=huruf.index(i)+3
+        if x>25:
+            body["password"]+=huruf[x-26]
+        else:
+            body["password"]+=huruf[x]
     
     response={}
     response["message"]="Create User Success"
@@ -74,8 +84,18 @@ def validasi():
     userData = json.load(userFile)
 
     for user in userData:
+        huruf="abcdefghijklmnopqrstuvwxyz"
+        password=user["password"]
+        user["password"]=""
+        for i in password:
+            x=huruf.index(i)-3
+            if x<0:
+                user["password"]+=huruf[x+26]
+            else:
+                user["password"]+=huruf[x]
         if body["username"]==user["username"] and body["password"]==user["password"]:
             response["message"]="Login User Success"
+            user["password"]="*"*len(user["password"])
             response["data"]=user
             return jsonify(response)
         else:
