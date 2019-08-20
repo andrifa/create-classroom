@@ -1,6 +1,7 @@
 from flask import Flask,jsonify, request, json
 import os
 from src.utils.crypt import encrypt,decrypt,readFile,writeFile
+from src.utils.authorization import encode
 apps=Flask(__name__)
 
 
@@ -93,6 +94,7 @@ def validasi():
             response["message"]="Login User Success"
             user["password"]="*"*len(user["password"])
             response["data"]=user
+            response["token"]=encode(body["username"])
             return jsonify(response)
         else:
             pass
@@ -127,6 +129,16 @@ def createClass():
     response={}
     response["message"]="Create Class Success"
     response["data"]={}
+
+    cekTeacher = readFile(userFileLoc)
+    count=False
+    for cek in cekTeacher:
+        if [cek["user id"]]==body["teachers"]:
+            count=True
+            break
+    if not count:
+        response["message"]="Teacher id {} is not recognized".format(body["teachers"][0])
+        return jsonify(response)
 
     userData=[]
     
