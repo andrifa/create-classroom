@@ -1,6 +1,14 @@
 from flask import Flask,jsonify, request, json
 import os
+from src.utils.crypt import encrypt,decrypt,readFile,writeFile
 apps=Flask(__name__)
+
+
+#------------------------Function--------------------------#
+userFileLoc='src/data/registrasi.json'
+classFileLoc='src/data/kelas.json'
+classworkFileLoc='src/data/classwork.json'
+#----------------------------------------------------------#
 
 @apps.route('/')
 def test0():
@@ -12,15 +20,7 @@ def daftar():
     body["class"]=[]
     body["classwork"]=[]
 
-    huruf="abcdefghijklmnopqrstuvwxyz"
-    password=body["password"]
-    body["password"]=""
-    for i in password:
-        x=huruf.index(i)+3
-        if x>25:
-            body["password"]+=huruf[x-26]
-        else:
-            body["password"]+=huruf[x]
+    body["password"]=encrypt(body["password"])
     
     response={}
     response["message"]="Create User Success"
@@ -28,32 +28,38 @@ def daftar():
 
     userData=[]
 
-    if os.path.exists ('./registrasi.json'):
-        userFile= open('./registrasi.json','r')
-        userData= json.load(userFile) 
+    if os.path.exists (userFileLoc): 
+        userData= readFile(userFileLoc)
 
     for userId in userData:
         if body["user id"]==userId["user id"] and userData!=[]:
             response["message"]="User ID {} is already exist".format(body["user id"])
             return jsonify(response)
-
+        elif body["username"]==userId["username"]:
+            response["message"]="Username is already exist"
+            return jsonify(response)
+        elif body["email"]==userId["email"]:
+            response["message"]="Email is already exist"
+            return jsonify(response)
+    
     userData.append(body)
 
-    userDict= open('./registrasi.json','w')
-    userDict.write(json.dumps(userData))
+    writeFile(userFileLoc,userData)
+
     response["data"]=body
     return jsonify(response)
 
 @apps.route('/daftar/<int:userid>',methods=["PUT"])
 def updateUser(userid):
     body= request.json
+
+    body["password"]=encrypt(body["password"])
     
     response={}
     response["message"]="Update User Success"
     response["data"]={}
 
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     count=0
     for user in userData:
         if user["user id"]==userid:
@@ -66,9 +72,8 @@ def updateUser(userid):
         response["message"]="User ID {} is not registered".format(userid)
         return jsonify(response)
     
+    writeFile(userFileLoc,userData)
 
-    userDict= open('./registrasi.json','w')
-    userDict.write(json.dumps(userData))
     response["data"]=body
     return jsonify(response)
             
@@ -80,19 +85,10 @@ def validasi():
     response["message"]="Login User Failed"
     response["data"]={}
 
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
 
-    for user in userData:
-        huruf="abcdefghijklmnopqrstuvwxyz"
-        password=user["password"]
-        user["password"]=""
-        for i in password:
-            x=huruf.index(i)-3
-            if x<0:
-                user["password"]+=huruf[x+26]
-            else:
-                user["password"]+=huruf[x]
+    for user in userData:        
+        user["password"]=decrypt(user["password"])
         if body["username"]==user["username"] and body["password"]==user["password"]:
             response["message"]="Login User Success"
             user["password"]="*"*len(user["password"])
@@ -109,8 +105,7 @@ def getUser(n):
     response["message"]="Get User Failed, user id {} is not registered".format(n)
     response["data"]={}
 
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     for user in userData:
         if user["user id"]==n:
             response["message"]="Get User {} Success".format(n)
@@ -120,8 +115,7 @@ def getUser(n):
 
 @apps.route('/getUser/all',methods=["GET"])
 def getUserAll():
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     return jsonify(userData)
 
 @apps.route('/class',methods=["POST"])
@@ -136,9 +130,8 @@ def createClass():
 
     userData=[]
     
-    if os.path.exists ('./kelas.json'):
-        userFile= open('./kelas.json','r')
-        userData= json.load(userFile) 
+    if os.path.exists (classFileLoc):
+        userData= readFile(classFileLoc)
     
     for classId in userData:
         if body["classid"]==classId["classid"] and userData!=[]:
@@ -147,12 +140,10 @@ def createClass():
 
     userData.append(body)
 
-    userDict= open('./kelas.json','w')
-    userDict.write(json.dumps(userData))
+    writeFile(classFileLoc,userData)
     
     #masukkin status ke user
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     
     for user in userData:
         if body["teachers"]==[user["user id"]]:
@@ -163,8 +154,7 @@ def createClass():
             if kelas not in user["class"]:
                 user["class"].append(kelas)
                 
-    userFile = open('./registrasi.json','w')
-    userFile.write(json.dumps(userData))
+    writeFile(userFileLoc,userData)
 
     response["data"]=body
     return jsonify(response)
@@ -177,8 +167,7 @@ def updateClass(classid):
     response["message"]="Update Class Success"
     response["data"]={}
 
-    userFile = open('./kelas.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classFileLoc)
     count=0
     for kelas in userData:
         if kelas["classid"]==classid:
@@ -190,8 +179,7 @@ def updateClass(classid):
         response["message"]="Update Class Failed, Class id {} is not registered".format(classid)
         return jsonify(response)
 
-    userDict= open('./kelas.json','w')
-    userDict.write(json.dumps(userData))
+    writeFile(classFileLoc,userData)
     
     response["data"]=kelas
 
@@ -204,10 +192,8 @@ def getClass(n):
     response["message"]="Class {} is not registered".format(n)
     response["data"]={}
 
-    userFile = open('./kelas.json','r')
-    userData = json.load(userFile)
-    userFile2 = open('./registrasi.json','r')
-    userData2 = json.load(userFile2)
+    userData = readFile(classFileLoc)
+    userData2 = readFile(userFileLoc)
     for kelas in userData:
         if kelas["classid"]==n:
             for idnama in range(len(kelas["student"])):
@@ -227,10 +213,8 @@ def getClass(n):
 
 @apps.route('/getClass/all',methods=["GET"])
 def getClassAll():
-    userFile = open('./kelas.json','r')
-    userData = json.load(userFile)
-    userFile2 = open('./classwork.json','r')
-    userData2 = json.load(userFile2)
+    userData = readFile(classFileLoc)
+    userData2 = readFile(classworkFileLoc)
 
     for kelas in userData:
         for kelasid in range(len(kelas["classwork"])):
@@ -244,8 +228,8 @@ def removeClass(classid):
     response={}
     response["message"]="Delete success, class {} is deleted".format(classid)
     response["data"]={}
-    cekFile = open('./kelas.json','r')
-    cekData = json.load(cekFile)
+
+    cekData = readFile(classFileLoc)
     
     count=0
     for cek in cekData:
@@ -257,8 +241,7 @@ def removeClass(classid):
 
     
     #delete class di user
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
 
     for kelas in userData:
         for kelas2 in kelas["class"]:
@@ -266,8 +249,7 @@ def removeClass(classid):
                 kelas["class"].remove(kelas2)                
                 break
         for kelas3 in kelas["classwork"]:
-            userFile2 = open('./kelas.json','r')
-            userData2 = json.load(userFile2) 
+            userData2 = readFile(classFileLoc)
             for work in userData2:
                 if work["classid"]==classid:
                     for work2 in work["classwork"]:
@@ -275,13 +257,11 @@ def removeClass(classid):
                             kelas["classwork"].remove(kelas3)
     
     #delete class di classwork
-    kelasFile = open('./kelas.json','r')
-    kelasData = json.load(kelasFile)
+    kelasData = readFile(classFileLoc)
 
     for classworks in kelasData:
         if classworks["classid"]==classid:
-            classWorkFile = open('./classwork.json','r')
-            classWorkData = json.load(classWorkFile)
+            classWorkData = readFile(classworkFileLoc)
             for tugas in classWorkData:
                 for classworks2 in classworks["classwork"]:
                     if tugas["classworkid"]==classworks2["classworkid"]:
@@ -292,26 +272,21 @@ def removeClass(classid):
         if kelasid["classid"]==classid:
             kelasData.remove(kelasid)
 
-    user=open('./registrasi.json','w')
-    classwork=open('./classwork.json','w')
-    kelas=open('./kelas.json','w')
-    
-    user.write(json.dumps(userData))
-    classwork.write(json.dumps(classWorkData))
-    kelas.write(json.dumps(kelasData))
-    
+    writeFile(userFileLoc,userData)
+    writeFile(classworkFileLoc,classWorkData)
+    writeFile(classFileLoc,kelasData)
+
     response["data"]=kelasData
     return jsonify(response)
 
 @apps.route('/removeId',methods=["GET"])
 def removeId():
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+
+    userData = readFile(userFileLoc)
     
     userData.pop()
     
-    userFile = open('./registrasi.json','w')
-    userFile.write(json.dumps(userData))
+    writeFile(userFileLoc,userData)
 
     return jsonify(userData)
 
@@ -322,8 +297,7 @@ def joinClass():
     response["message"]="Join class success, user id {} join class {}".format(body["user id"],body["classid"])
     response["data"]={}
 
-    cekFile = open('./registrasi.json','r')
-    cekData = json.load(cekFile)
+    cekData = readFile(userFileLoc)
     check=0
     for cek in cekData:
         if cek["user id"]==body["user id"]:
@@ -335,8 +309,7 @@ def joinClass():
 
     #masukin user ke class
 
-    userFile = open('./kelas.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classFileLoc)
 
     count=0
     for kelas in userData:
@@ -356,13 +329,11 @@ def joinClass():
         response["message"]="Join class failed, class id {} is not registered".format(body["classid"])
         return jsonify(response)
     
-    userFile = open('./kelas.json','w')
-    userFile.write(json.dumps(userData))
+    writeFile(classFileLoc,userData)
 
     #masukin class ke user
 
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     
     for user in userData:
         if body["user id"]==user["user id"]:
@@ -378,8 +349,7 @@ def joinClass():
                 user["class"].append(kelas)
                 break
                 
-    userFile = open('./registrasi.json','w')
-    userFile.write(json.dumps(userData))
+    writeFile(userFileLoc,userData)
     
     response["data"]=user
     return jsonify(response)
@@ -391,8 +361,7 @@ def outclass():
     response["message"]="leave class success, user id {} left class {}".format(body["user id"],body["classid"])
     response["data"]={}
 
-    cekFile = open('./registrasi.json','r')
-    cekData = json.load(cekFile)
+    cekData = readFile(userFileLoc)
     check=0
     for cek in cekData:
         if cek["user id"]==body["user id"]:
@@ -402,8 +371,7 @@ def outclass():
         return jsonify(response)
     #remove user dari class
 
-    userFile = open('./kelas.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classFileLoc)
 
     count=0
     for kelas in userData:
@@ -422,16 +390,10 @@ def outclass():
         response["message"]="Leave class failed, class id {} is not registered".format(body["classid"])
         return jsonify(response)
     
-    userFile2 = open('./kelas.json','w')
-    userFile2.write(json.dumps(userData))
-    userFile2.close()
-
-    CWFile = open('./registrasi.json','r')
-    CWData = json.load(CWFile)
+    CWData = readFile(userFileLoc)
     
     #remove classwork dari user
-    userCWFile = open('./kelas.json','r')
-    userCWData = json.load(userCWFile) 
+    userCWData = readFile(classFileLoc) 
 
     for userCW in userCWData:
         if body["classid"]==userCW["classid"]:
@@ -452,8 +414,8 @@ def outclass():
                 user["class"].remove(kelas)
                 break
 
-    userFile = open('./registrasi.json','w')
-    userFile.write(json.dumps(CWData))
+    writeFile(classFileLoc,userData)
+    writeFile(userFileLoc,CWData)
     
     response["data"]=user
     return jsonify(response)
@@ -466,9 +428,8 @@ def classwork(classid):
     response["message"]="create classwork success"
     response["data"]={}
 
-    if os.path.exists ('./classwork.json'):
-        userFile= open('./classwork.json','r')
-        userData= json.load(userFile)
+    if os.path.exists (classworkFileLoc):
+        userData= readFile(classworkFileLoc)
         for idtugas in userData:
             if body["classworkid"]==idtugas["classworkid"]:
                 response["message"]="create classwork failed, classwork id {} already exists, try another one".format(body["classworkid"])
@@ -476,8 +437,7 @@ def classwork(classid):
     
     #masukin tugas ke class
 
-    userFile = open('./kelas.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classFileLoc)
 
     check=0
     for cek in userData:
@@ -495,13 +455,12 @@ def classwork(classid):
     for kelas in userData:
         if classid==kelas["classid"]:
             kelas["classwork"].append(body)
-    userFile = open('./kelas.json','w')
-    userFile.write(json.dumps(userData))
+    
+    writeFile(classFileLoc,userData)
 
     #masukin class ke user
 
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     
     for user in userData:
         kelas={
@@ -511,20 +470,17 @@ def classwork(classid):
         if kelas in user["class"]:
             user["classwork"].append(body)
                 
-    userFile = open('./registrasi.json','w')
-    userFile.write(json.dumps(userData))
+    writeFile(userFileLoc,userData)
 
     #masukin tugas ke file baru
     userData=[]
     body["answers"]=[]
-    if os.path.exists ('./classwork.json'):
-        userFile= open('./classwork.json','r')
-        userData= json.load(userFile) 
+    if os.path.exists (classworkFileLoc):
+        userData= readFile(classworkFileLoc) 
 
     userData.append(body)
 
-    userDict= open('./classwork.json','w')
-    userDict.write(json.dumps(userData))
+    writeFile(classworkFileLoc,userData)
 
     response["data"]=body
     return jsonify(response)
@@ -538,8 +494,7 @@ def assignClasswork(classworkid):
     response["data"]={}
 
     #cek keberadaan id
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     count=0
     for user in userData:
         if body["user id"] == user["user id"]:
@@ -563,8 +518,7 @@ def assignClasswork(classworkid):
                 response["message"]="assign classwork failed, no classwork classwork id {}".format(classworkid)
                 return jsonify(response)
                
-    userDict= open('./registrasi.json','w')
-    userDict.write(json.dumps(userData)) 
+    writeFile(userFileLoc,userData) 
     
     if cobacek==1:
         pass
@@ -573,8 +527,7 @@ def assignClasswork(classworkid):
         return jsonify(response)
 
     #memasukkan tugas ke classwork
-    userFile = open('./classwork.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classworkFileLoc)
 
     for cek in userData:
         if cek["classworkid"]==classworkid:
@@ -588,16 +541,14 @@ def assignClasswork(classworkid):
             tugas["answers"].append(body)
             break
            
-    userDict= open('./classwork.json','w')
-    userDict.write(json.dumps(userData))
+    writeFile(classworkFileLoc,userData)
     
     response["data"]=tugas
     return jsonify(response)
 
 @apps.route('/getClassWork/<int:n>',methods=["GET"])
 def getClassWork(n):
-    userFile = open('./classwork.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classworkFileLoc)
     response={}
     response["message"]="get classwork failed, no id classwork"
     response["data"]={}
@@ -610,8 +561,7 @@ def getClassWork(n):
 
 @apps.route('/getClassWork/all',methods=["GET"])
 def getClassWorkAll():
-    userFile = open('./classwork.json','r')
-    userData = json.load(userFile)
+    userData = readFile(classworkFileLoc)
     return jsonify(userData)
 
 @apps.route('/classwork/<int:classworkid>',methods=["PUT"])
@@ -622,8 +572,7 @@ def updateClasswork(classworkid):
     response["message"]="Update classwork success"
     response["data"]={}
 
-    cekFile = open('./classwork.json','r')
-    cekData = json.load(cekFile)
+    cekData = readFile(classworkFileLoc)
     count=0
     for cek in cekData:
         if cek["classworkid"]==classworkid:
@@ -633,34 +582,29 @@ def updateClasswork(classworkid):
         return jsonify(response)
 
     #update in user
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     for cwUser in userData:
         for cwUser2 in cwUser["classwork"]:
             if classworkid==cwUser2["classworkid"]:
                 cwUser2["question"]=body["question"]
                 break
     #update in class
-    kelasFile = open('./kelas.json','r')
-    kelasData = json.load(kelasFile)
+    kelasData = readFile(classFileLoc)
     for cwKelas in kelasData:
         for cwKelas2 in cwKelas["classwork"]:
             if classworkid==cwKelas2["classworkid"]:
                 cwKelas2["question"]=body["question"]
                 break
     #update in classwork
-    tugasFile = open('./classwork.json','r')
-    tugasData = json.load(tugasFile)
+    tugasData = readFile(classworkFileLoc)
     for cwTugas in tugasData:
         if classworkid==cwTugas["classworkid"]:
             cwTugas["question"]=body["question"]
             break
-    user = open('./registrasi.json','w')
-    kelas = open('./kelas.json','w')
-    tugas = open('./classwork.json','w') 
-    user.write(json.dumps(userData))
-    kelas.write(json.dumps(kelasData))
-    tugas.write(json.dumps(tugasData))   
+    
+    writeFile(userFileLoc,userData)
+    writeFile(classFileLoc,kelasData)
+    writeFile(classworkFileLoc,tugasData)   
     
     response["data"]=tugasData
     return jsonify(response)
@@ -673,8 +617,7 @@ def removeClasswork(classworkid):
     response["message"]="Remove classwork success"
     response["data"]={}
 
-    cekFile = open('./classwork.json','r')
-    cekData = json.load(cekFile)
+    cekData = readFile(classworkFileLoc)
     count=0
     for cek in cekData:
         if cek["classworkid"]==classworkid:
@@ -684,34 +627,29 @@ def removeClasswork(classworkid):
         return jsonify(response)
 
     #update in user
-    userFile = open('./registrasi.json','r')
-    userData = json.load(userFile)
+    userData = readFile(userFileLoc)
     for cwUser in userData:
         for cwUser2 in cwUser["classwork"]:
             if classworkid==cwUser2["classworkid"]:
                 cwUser["classwork"].remove(cwUser2)
                 break
     #update in class
-    kelasFile = open('./kelas.json','r')
-    kelasData = json.load(kelasFile)
+    kelasData = readFile(classFileLoc)
     for cwKelas in kelasData:
         for cwKelas2 in cwKelas["classwork"]:
             if classworkid==cwKelas2["classworkid"]:
                 cwKelas["classwork"].remove(cwKelas2)
                 break
     #update in classwork
-    tugasFile = open('./classwork.json','r')
-    tugasData = json.load(tugasFile)
+    tugasData = readFile(classworkFileLoc)
     for cwTugas in tugasData:
         if classworkid==cwTugas["classworkid"]:
             tugasData.remove(cwTugas)
             break
-    user = open('./registrasi.json','w')
-    kelas = open('./kelas.json','w')
-    tugas = open('./classwork.json','w') 
-    user.write(json.dumps(userData))
-    kelas.write(json.dumps(kelasData))
-    tugas.write(json.dumps(tugasData))   
+    
+    writeFile(userFileLoc,userData) 
+    writeFile(classFileLoc,kelasData)
+    writeFile(classworkFileLoc,tugasData)  
     
     response["data"]=tugasData
     return jsonify(response)
